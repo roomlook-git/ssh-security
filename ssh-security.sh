@@ -176,11 +176,11 @@ get_ssh_port() {
     local port
 
     # 优先使用sshd -T命令（更可靠）
-    port=$(sshd -T 2>/dev/null | grep "^port " | awk '{print $2}' || true)
+    port=$(sshd -T 2>/dev/null | grep "^port " | awk '{print $2}' | head -1 || true)
 
-    # 如果失败，尝试从配置文件读取
+    # 如果失败，尝试从配置文件读取（只取第一个匹配）
     if [[ -z "$port" ]] && [[ -f "$SSHD_CONFIG" ]]; then
-        port=$(grep -E "^Port\s+" "$SSHD_CONFIG" | awk '{print $2}' || true)
+        port=$(grep -E "^Port\s+" "$SSHD_CONFIG" | awk '{print $2}' | head -1 || true)
     fi
 
     # 默认端口
@@ -188,6 +188,8 @@ get_ssh_port() {
         port=22
     fi
 
+    # 清理可能的空白字符并只返回第一个值
+    port=$(echo "$port" | tr -d '[:space:]' | head -c 10)
     echo "$port"
 }
 
@@ -686,6 +688,9 @@ install_fail2ban() {
 
     print_info "当前SSH端口: $ssh_port"
     read -p "请输入要保护的端口 (多个端口用逗号分隔，直接回车使用 $ssh_port): " ports
+
+    # 清理输入：去除前后空白、换行符，转换多个空格为单个
+    ports=$(echo "$ports" | xargs)
 
     if [[ -z "$ports" ]]; then
         ports="$ssh_port"
