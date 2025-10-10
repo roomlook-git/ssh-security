@@ -18,7 +18,7 @@
 ssh root@new_server_ip
 
 # 下载并运行脚本
-bash <(curl -s https://raw.githubusercontent.com/[用户名]/[仓库名]/main/ssh-security.sh)
+bash <(curl -s https://raw.githubusercontent.com/roomlook-git/ssh-security/main/ssh-security.sh)
 
 # 执行流程：
 # 1. 先配置SSH密钥（在本地电脑）
@@ -317,7 +317,7 @@ done
 
     - name: 下载安全配置脚本
       get_url:
-        url: https://raw.githubusercontent.com/[用户名]/[仓库名]/main/ssh-security.sh
+        url: https://raw.githubusercontent.com/roomlook-git/ssh-security/main/ssh-security.sh
         dest: /tmp/ssh-security.sh
         mode: '0755'
 
@@ -347,7 +347,7 @@ apt install openssh-server sudo curl -y
 service ssh start
 
 # 运行脚本测试
-bash <(curl -s https://raw.githubusercontent.com/[用户名]/[仓库名]/main/ssh-security.sh)
+bash <(curl -s https://raw.githubusercontent.com/roomlook-git/ssh-security/main/ssh-security.sh)
 ```
 
 ### 场景14：Terraform自动化
@@ -471,5 +471,5 @@ sudo grep "Ban" /var/log/fail2ban.log | tail -20
 
 **更多示例和用例持续更新中...**
 
-有问题？查看 [README.md](README.md) 或提交 [Issue](https://github.com/[用户名]/[仓库名]/issues)
+有问题？查看 [README.md](README.md) 或提交 [Issue](https://github.com/roomlook-git/ssh-security/issues)
 

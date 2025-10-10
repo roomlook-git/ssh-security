@@ -303,13 +303,13 @@ ssh-security-v1.0.0.tar.gz
 
 ```bash
 # 方式1：直接下载主脚本
-curl -O https://raw.githubusercontent.com/[用户名]/[仓库名]/main/ssh-security.sh
+curl -O https://raw.githubusercontent.com/roomlook-git/ssh-security/main/ssh-security.sh
 
 # 方式2：克隆整个仓库
-git clone https://github.com/[用户名]/[仓库名].git
+git clone https://github.com/roomlook-git/ssh-security.git
 
 # 方式3：下载发布包
-wget https://github.com/[用户名]/[仓库名]/releases/download/v1.0.0/ssh-security-v1.0.0.tar.gz
+wget https://github.com/roomlook-git/ssh-security/releases/download/v1.0.0/ssh-security-v1.0.0.tar.gz
 ```
 
 ## 🎯 使用流程
@@ -373,7 +373,7 @@ wget https://github.com/[用户名]/[仓库名]/releases/download/v1.0.0/ssh-sec
 cat ssh-security.sh | less
 
 # 或先查看不运行
-curl -s https://raw.githubusercontent.com/[用户名]/[仓库名]/main/ssh-security.sh | less
+curl -s https://raw.githubusercontent.com/roomlook-git/ssh-security/main/ssh-security.sh | less
 ```
 
 ## 📈 维护说明

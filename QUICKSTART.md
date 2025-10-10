@@ -6,10 +6,10 @@
 
 ```bash
 # 方式1：一键运行（推荐）
-bash <(curl -s https://raw.githubusercontent.com/[用户名]/[仓库名]/main/ssh-security.sh)
+bash <(curl -s https://raw.githubusercontent.com/roomlook-git/ssh-security/main/ssh-security.sh)
 
 # 方式2：下载后运行
-curl -O https://raw.githubusercontent.com/[用户名]/[仓库名]/main/ssh-security.sh
+curl -O https://raw.githubusercontent.com/roomlook-git/ssh-security/main/ssh-security.sh
 chmod +x ssh-security.sh
 sudo ./ssh-security.sh
 ```
@@ -344,7 +344,7 @@ sudo systemctl restart sshd
 ## 🆘 获取帮助
 
 - 查看完整文档：[README.md](README.md)
-- 提交问题：[GitHub Issues](https://github.com/[用户名]/[仓库名]/issues)
+- 提交问题：[GitHub Issues](https://github.com/roomlook-git/ssh-security/issues)
 - 安全建议：阅读 README.md 中的"安全建议"章节
 
 ---

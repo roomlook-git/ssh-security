@@ -8,7 +8,7 @@
 
 如果你发现了bug或有功能建议：
 
-1. 在提交前搜索现有的 [Issues](https://github.com/[用户名]/[仓库名]/issues)
+1. 在提交前搜索现有的 [Issues](https://github.com/roomlook-git/ssh-security/issues)
 2. 如果没有找到相关问题，创建新的 Issue
 3. 使用清晰的标题和详细的描述
 4. 包含复现步骤（如果是bug）

@@ -37,14 +37,14 @@
 ### 方式一：一键运行（推荐）
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/[用户名]/[仓库名]/main/ssh-security.sh)
+bash <(curl -s https://raw.githubusercontent.com/roomlook-git/ssh-security/main/ssh-security.sh)
 ```
 
 ### 方式二：下载后运行
 
 ```bash
 # 下载脚本
-curl -O https://raw.githubusercontent.com/[用户名]/[仓库名]/main/ssh-security.sh
+curl -O https://raw.githubusercontent.com/roomlook-git/ssh-security/main/ssh-security.sh
 
 # 添加执行权限
 chmod +x ssh-security.sh
@@ -56,7 +56,7 @@ sudo ./ssh-security.sh
 ### 方式三：使用 wget
 
 ```bash
-wget https://raw.githubusercontent.com/[用户名]/[仓库名]/main/ssh-security.sh
+wget https://raw.githubusercontent.com/roomlook-git/ssh-security/main/ssh-security.sh
 chmod +x ssh-security.sh
 sudo ./ssh-security.sh
 ```
@@ -437,8 +437,8 @@ logpath = /var/log/mysql/error.log
 
 ## 📮 联系方式
 
-- 提交 Issue: [GitHub Issues](https://github.com/[用户名]/[仓库名]/issues)
-- Pull Request: [GitHub PR](https://github.com/[用户名]/[仓库名]/pulls)
+- 提交 Issue: [GitHub Issues](https://github.com/roomlook-git/ssh-security/issues)
+- Pull Request: [GitHub PR](https://github.com/roomlook-git/ssh-security/pulls)
 
 ---
 

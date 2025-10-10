@@ -144,6 +144,6 @@
 
 ---
 
-**[未发布]**: https://github.com/[用户名]/[仓库名]/compare/v1.0.0...HEAD
-**[1.0.0]**: https://github.com/[用户名]/[仓库名]/releases/tag/v1.0.0
+**[未发布]**: https://github.com/roomlook-git/ssh-security/compare/v1.0.0...HEAD
+**[1.0.0]**: https://github.com/roomlook-git/ssh-security/releases/tag/v1.0.0
 
