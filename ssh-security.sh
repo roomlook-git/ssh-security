@@ -14,7 +14,7 @@ readonly SCRIPT_VERSION="1.0.0"
 readonly LOG_FILE="/var/log/ssh-security-script.log"
 readonly SSHD_CONFIG="/etc/ssh/sshd_config"
 readonly SSHD_CONFIG_DIR="/etc/ssh/sshd_config.d"
-readonly SSHD_SECURITY_CONF="/etc/ssh/sshd_config.d/99-security.conf"
+readonly SSHD_SECURITY_CONF="/etc/ssh/sshd_config.d/00-security.conf"
 readonly FAIL2BAN_JAIL="/etc/fail2ban/jail.local"
 readonly BACKUP_DIR="/root/ssh-security-backups"
 
@@ -256,9 +256,20 @@ restart_ssh() {
                 echo "  ✓ 密码登录: 已禁用"
                 echo "  ✓ Root登录: 仅密钥"
             else
-                print_warning "配置可能未完全生效，请手动验证："
+                print_error "配置验证失败！安全配置未正确生效"
                 echo "  当前 PasswordAuthentication: $password_auth (期望: no)"
                 echo "  当前 PermitRootLogin: $root_login (期望: prohibit-password)"
+                echo
+                print_warning "可能的原因："
+                echo "  1. 存在其他配置文件覆盖了我们的设置"
+                echo "  2. 主配置文件中存在冲突的设置"
+                echo
+                print_info "运行诊断命令："
+                echo "  bash ssh-diagnosis.sh"
+                echo
+                print_info "或手动检查："
+                echo "  sshd -T | grep -E '(passwordauthentication|permitrootlogin)'"
+                echo "  ls -la /etc/ssh/sshd_config.d/"
             fi
 
             return 0
@@ -283,9 +294,20 @@ restart_ssh() {
                 echo "  ✓ 密码登录: 已禁用"
                 echo "  ✓ Root登录: 仅密钥"
             else
-                print_warning "配置可能未完全生效，请手动验证："
+                print_error "配置验证失败！安全配置未正确生效"
                 echo "  当前 PasswordAuthentication: $password_auth (期望: no)"
                 echo "  当前 PermitRootLogin: $root_login (期望: prohibit-password)"
+                echo
+                print_warning "可能的原因："
+                echo "  1. 存在其他配置文件覆盖了我们的设置"
+                echo "  2. 主配置文件中存在冲突的设置"
+                echo
+                print_info "运行诊断命令："
+                echo "  bash ssh-diagnosis.sh"
+                echo
+                print_info "或手动检查："
+                echo "  sshd -T | grep -E '(passwordauthentication|permitrootlogin)'"
+                echo "  ls -la /etc/ssh/sshd_config.d/"
             fi
 
             return 0
@@ -528,6 +550,27 @@ disable_password_login() {
         chmod 755 "$SSHD_CONFIG_DIR"
     fi
 
+    # 检查并迁移旧的 99-security.conf 到新的 00-security.conf
+    local old_security_conf="/etc/ssh/sshd_config.d/99-security.conf"
+    if [[ -f "$old_security_conf" ]] && [[ "$old_security_conf" != "$SSHD_SECURITY_CONF" ]]; then
+        echo
+        print_info "检测到旧版配置文件，正在迁移..."
+        print_info "  旧文件: 99-security.conf (可能被其他配置覆盖)"
+        print_info "  新文件: 00-security.conf (确保优先加载)"
+
+        # 备份旧文件
+        backup_file "$old_security_conf"
+
+        # 如果新文件不存在，移动过去；如果存在，删除旧文件
+        if [[ ! -f "$SSHD_SECURITY_CONF" ]]; then
+            mv "$old_security_conf" "$SSHD_SECURITY_CONF"
+            print_success "已迁移配置文件到 00-security.conf"
+        else
+            rm -f "$old_security_conf"
+            print_success "已删除旧配置文件（新文件已存在）"
+        fi
+    fi
+
     # 检查主配置文件是否包含 Include 指令
     print_info "检查主配置文件的 Include 指令..."
     if ! grep -q "^Include /etc/ssh/sshd_config.d/\*.conf" "$SSHD_CONFIG" 2>/dev/null; then
@@ -569,12 +612,12 @@ disable_password_login() {
             echo
         done
 
-        print_warning "这些文件可能会覆盖我们的安全配置！"
+        print_warning "这些文件可能会与我们的安全配置冲突！"
         print_info "说明：SSH配置遵循'首次匹配生效'原则，按字母顺序加载配置文件"
-        print_info "文件名靠前（如01-）的配置会覆盖靠后（如99-）的配置"
+        print_info "我们使用 00-security.conf 确保安全配置最先加载并生效"
         echo
 
-        if confirm "是否备份并移除这些冲突的配置文件？"; then
+        if confirm "是否备份并移除这些冲突的配置文件？(推荐)"; then
             for file in "${conflicting_files[@]}"; do
                 # 备份冲突文件
                 if backup_file "$file"; then
@@ -588,8 +631,9 @@ disable_password_login() {
             echo
             print_success "冲突配置已处理"
         else
-            print_warning "保留冲突配置文件，但安全配置可能不会生效！"
-            print_info "建议：配置完成后手动删除这些文件或重命名为 zz- 开头"
+            print_warning "保留了冲突配置文件"
+            print_info "由于我们使用 00- 前缀，安全配置应该能够优先生效"
+            print_info "但如果仍有问题，建议手动删除这些冲突文件"
         fi
         echo
     else
@@ -605,7 +649,8 @@ disable_password_login() {
 # 由 $SCRIPT_NAME 自动生成
 # 生成时间: $(date '+%Y-%m-%d %H:%M:%S')
 #
-# 说明：本配置文件仅覆盖必要的安全设置，不影响主配置文件中的其他配置
+# 说明：本配置文件使用 00- 前缀确保最先加载，遵循 SSH 的"首次匹配生效"原则
+#       这样可以防止其他配置文件（如云服务商的预置配置）覆盖我们的安全设置
 
 # 端口配置
 Port $new_port
@@ -678,7 +723,8 @@ EOF
         fi
 
         # 恢复旧的 drop-in 配置（如果有备份）
-        local security_backup=$(ls -t "$BACKUP_DIR"/99-security.conf.bak.* 2>/dev/null | head -1 || true)
+        # 兼容新旧两种文件名：00-security.conf 和 99-security.conf
+        local security_backup=$(ls -t "$BACKUP_DIR"/{00,99}-security.conf.bak.* 2>/dev/null | head -1 || true)
         if [[ -n "$security_backup" ]]; then
             cp "$security_backup" "$SSHD_SECURITY_CONF"
             print_success "已恢复旧安全配置: $SSHD_SECURITY_CONF"
@@ -1506,7 +1552,8 @@ restore_backup() {
     local is_ssh_config=false
     local is_security_conf=false
 
-    if [[ $backup_name =~ 99-security\.conf ]]; then
+    # 兼容新旧两种安全配置文件名
+    if [[ $backup_name =~ (00|99)-security\.conf ]]; then
         target_file="$SSHD_SECURITY_CONF"
         is_security_conf=true
         print_warning "警告: 恢复 SSH 安全配置可能影响登录！"
