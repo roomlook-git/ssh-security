@@ -655,7 +655,7 @@ EOF
     local syntax_check_output
     syntax_check_output=$(sshd -t 2>&1)
     local syntax_check_result=$?
-    
+
     if [[ $syntax_check_result -eq 0 ]]; then
         print_success "配置文件语法检查通过"
     else
@@ -1505,7 +1505,7 @@ restore_backup() {
     local target_file
     local is_ssh_config=false
     local is_security_conf=false
-    
+
     if [[ $backup_name =~ 99-security\.conf ]]; then
         target_file="$SSHD_SECURITY_CONF"
         is_security_conf=true
@@ -1579,7 +1579,7 @@ restore_backup() {
         local syntax_output
         syntax_output=$(sshd -t 2>&1)
         local syntax_result=$?
-        
+
         if [[ $syntax_result -eq 0 ]]; then
             print_success "配置语法正确"
 
@@ -1608,7 +1608,7 @@ restore_backup() {
         else
             print_error "配置语法错误！"
             echo "错误详情: $syntax_output"
-            
+
             # 尝试回滚
             if [[ -n "${pre_restore_backup:-}" ]] && [[ -f "$pre_restore_backup" ]]; then
                 echo
@@ -1616,7 +1616,7 @@ restore_backup() {
                 if confirm "是否回滚到恢复前的配置？"; then
                     cp "$pre_restore_backup" "$target_file"
                     print_success "已回滚到恢复前状态"
-                    
+
                     # 验证回滚后的配置
                     if sshd -t 2>&1; then
                         print_success "回滚后的配置语法正确"
