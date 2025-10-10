@@ -641,20 +641,63 @@ EOF
     print_success "新配置已生成"
     echo
 
+    # 检查并创建 /run/sshd 目录（某些系统需要此目录用于权限分离）
+    print_info "检查SSH运行环境..."
+    if [[ ! -d "/run/sshd" ]]; then
+        print_info "创建 SSH 权限分离目录..."
+        mkdir -p /run/sshd
+        chmod 755 /run/sshd
+        print_success "已创建 /run/sshd 目录"
+    fi
+
     # 检查配置语法
     print_info "检查配置文件语法..."
-    if sshd -t 2>&1; then
+    local syntax_check_output
+    syntax_check_output=$(sshd -t 2>&1)
+    local syntax_check_result=$?
+    
+    if [[ $syntax_check_result -eq 0 ]]; then
         print_success "配置文件语法检查通过"
     else
         print_error "配置文件语法检查失败"
+        echo "错误详情: $syntax_check_output"
+        echo
         print_info "正在恢复备份..."
 
+        # 恢复主配置文件
         local latest_backup=$(ls -t "$BACKUP_DIR"/sshd_config.bak.* 2>/dev/null | head -1 || true)
         if [[ -n "$latest_backup" ]]; then
             cp "$latest_backup" "$SSHD_CONFIG"
-            print_success "已恢复备份配置"
+            print_success "已恢复主配置: $SSHD_CONFIG"
         fi
 
+        # 删除有问题的 drop-in 配置文件
+        if [[ -f "$SSHD_SECURITY_CONF" ]]; then
+            rm -f "$SSHD_SECURITY_CONF"
+            print_success "已删除问题配置: $SSHD_SECURITY_CONF"
+        fi
+
+        # 恢复旧的 drop-in 配置（如果有备份）
+        local security_backup=$(ls -t "$BACKUP_DIR"/99-security.conf.bak.* 2>/dev/null | head -1 || true)
+        if [[ -n "$security_backup" ]]; then
+            cp "$security_backup" "$SSHD_SECURITY_CONF"
+            print_success "已恢复旧安全配置: $SSHD_SECURITY_CONF"
+        fi
+
+        # 尝试重启SSH服务以应用恢复的配置
+        print_info "尝试重启SSH服务以恢复正常状态..."
+        if restart_ssh; then
+            print_success "SSH服务已恢复正常"
+        else
+            print_error "SSH服务重启失败，请手动检查！"
+            print_warning "紧急恢复命令："
+            echo "  1. 恢复配置: cp $latest_backup $SSHD_CONFIG"
+            echo "  2. 删除问题文件: rm -f $SSHD_SECURITY_CONF"
+            echo "  3. 重启服务: systemctl restart sshd 或 systemctl restart ssh"
+        fi
+
+        echo
+        print_error "配置失败，已回滚所有更改"
         return 1
     fi
 
@@ -1460,9 +1503,17 @@ restore_backup() {
 
     # 确定目标文件
     local target_file
-    if [[ $backup_name =~ sshd_config ]]; then
+    local is_ssh_config=false
+    local is_security_conf=false
+    
+    if [[ $backup_name =~ 99-security\.conf ]]; then
+        target_file="$SSHD_SECURITY_CONF"
+        is_security_conf=true
+        print_warning "警告: 恢复 SSH 安全配置可能影响登录！"
+    elif [[ $backup_name =~ sshd_config ]]; then
         target_file="$SSHD_CONFIG"
-        print_warning "警告: 恢复 SSH 配置可能导致无法登录！"
+        is_ssh_config=true
+        print_warning "警告: 恢复 SSH 主配置可能导致无法登录！"
     elif [[ $backup_name =~ jail ]]; then
         target_file="$FAIL2BAN_JAIL"
     else
@@ -1488,6 +1539,14 @@ restore_backup() {
 
     print_success "备份文件完整性检查通过"
 
+    # 在恢复前备份当前配置（双重保险）
+    if [[ -f "$target_file" ]]; then
+        print_info "备份当前配置（恢复前保险）..."
+        local pre_restore_backup="${target_file}.pre-restore.$(date '+%Y%m%d_%H%M%S')"
+        cp "$target_file" "$pre_restore_backup"
+        print_success "已备份至: $pre_restore_backup"
+    fi
+
     # 恢复备份
     print_info "正在恢复备份..."
 
@@ -1496,6 +1555,11 @@ restore_backup() {
     # 验证恢复结果
     if [[ ! -s "$target_file" ]]; then
         print_error "恢复失败：目标文件为空"
+        # 尝试恢复刚才的备份
+        if [[ -n "${pre_restore_backup:-}" ]] && [[ -f "$pre_restore_backup" ]]; then
+            cp "$pre_restore_backup" "$target_file"
+            print_warning "已回滚到恢复前状态"
+        fi
         return 1
     fi
 
@@ -1503,20 +1567,65 @@ restore_backup() {
     echo
 
     # 根据文件类型重启服务
-    if [[ $backup_name =~ sshd_config ]]; then
+    if [[ "$is_ssh_config" == true ]] || [[ "$is_security_conf" == true ]]; then
+        # 检查并创建 /run/sshd 目录
+        if [[ ! -d "/run/sshd" ]]; then
+            print_info "创建 SSH 权限分离目录..."
+            mkdir -p /run/sshd
+            chmod 755 /run/sshd
+        fi
+
         print_info "检查SSH配置语法..."
-        if sshd -t 2>&1; then
+        local syntax_output
+        syntax_output=$(sshd -t 2>&1)
+        local syntax_result=$?
+        
+        if [[ $syntax_result -eq 0 ]]; then
             print_success "配置语法正确"
 
             if confirm "是否重启SSH服务？"; then
-                restart_ssh
-                print_success "SSH配置已生效"
+                if restart_ssh; then
+                    print_success "SSH配置已生效"
+                else
+                    print_error "SSH服务重启失败！"
+                    print_warning "配置已恢复但服务未正常启动"
+                    if [[ -n "${pre_restore_backup:-}" ]] && [[ -f "$pre_restore_backup" ]]; then
+                        echo
+                        if confirm "是否回滚到恢复前的配置？"; then
+                            cp "$pre_restore_backup" "$target_file"
+                            print_info "尝试重启SSH服务..."
+                            if restart_ssh; then
+                                print_success "已回滚并恢复服务"
+                            else
+                                print_error "回滚后仍无法启动，请手动检查！"
+                            fi
+                        fi
+                    fi
+                fi
             else
                 print_warning "配置已恢复但未重启服务"
             fi
         else
             print_error "配置语法错误！"
-            sshd -t
+            echo "错误详情: $syntax_output"
+            
+            # 尝试回滚
+            if [[ -n "${pre_restore_backup:-}" ]] && [[ -f "$pre_restore_backup" ]]; then
+                echo
+                print_warning "检测到配置语法错误"
+                if confirm "是否回滚到恢复前的配置？"; then
+                    cp "$pre_restore_backup" "$target_file"
+                    print_success "已回滚到恢复前状态"
+                    
+                    # 验证回滚后的配置
+                    if sshd -t 2>&1; then
+                        print_success "回滚后的配置语法正确"
+                        if confirm "是否重启SSH服务？"; then
+                            restart_ssh
+                        fi
+                    fi
+                fi
+            fi
         fi
     elif [[ $backup_name =~ jail ]]; then
         print_info "重启 fail2ban 服务..."
