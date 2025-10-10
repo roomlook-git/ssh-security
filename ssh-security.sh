@@ -497,9 +497,6 @@ ClientAliveCountMax 2
 # 安全加固
 X11Forwarding no
 PrintMotd no
-
-# SFTP 子系统 - 使用内置的 internal-sftp
-Subsystem sftp internal-sftp
 EOF
 
     print_success "新配置已生成"
