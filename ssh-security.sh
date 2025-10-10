@@ -228,15 +228,73 @@ restart_ssh() {
 
     print_info "检测到SSH服务: $service_name"
 
+    # 检查是否使用 socket 激活模式
+    local using_socket=false
+    if systemctl status "$service_name" 2>/dev/null | grep -q "TriggeredBy:.*${service_name}.socket"; then
+        using_socket=true
+        print_info "检测到 socket 激活模式"
+    fi
+
     # 执行重启
-    if systemctl restart "$service_name" 2>&1; then
-        print_success "SSH服务已重启"
-        return 0
+    if [[ "$using_socket" == true ]]; then
+        # Socket 激活模式：需要停止 socket 和 service，然后重启 service
+        print_info "停止 ${service_name}.socket 和 ${service_name}.service..."
+        systemctl stop "${service_name}.socket" 2>/dev/null || true
+        systemctl stop "${service_name}.service" 2>/dev/null || true
+
+        print_info "启动 ${service_name}.service..."
+        if systemctl start "${service_name}.service" 2>&1; then
+            print_success "SSH服务已重启（socket模式）"
+
+            # 验证配置是否生效
+            print_info "验证配置..."
+            local password_auth=$(sshd -T 2>/dev/null | grep "^passwordauthentication" | awk '{print $2}')
+            local root_login=$(sshd -T 2>/dev/null | grep "^permitrootlogin" | awk '{print $2}')
+
+            if [[ "$password_auth" == "no" ]] && [[ "$root_login" == "prohibit-password" ]]; then
+                print_success "配置验证通过："
+                echo "  ✓ 密码登录: 已禁用"
+                echo "  ✓ Root登录: 仅密钥"
+            else
+                print_warning "配置可能未完全生效，请手动验证："
+                echo "  当前 PasswordAuthentication: $password_auth (期望: no)"
+                echo "  当前 PermitRootLogin: $root_login (期望: prohibit-password)"
+            fi
+
+            return 0
+        else
+            print_error "SSH服务启动失败"
+            print_info "尝试恢复 socket 模式..."
+            systemctl start "${service_name}.socket" 2>/dev/null || true
+            return 1
+        fi
     else
-        print_error "SSH服务重启失败"
-        print_info "查看服务状态："
-        systemctl status "$service_name" --no-pager -l || true
-        return 1
+        # 传统模式：直接重启 service
+        if systemctl restart "$service_name" 2>&1; then
+            print_success "SSH服务已重启"
+
+            # 验证配置是否生效
+            print_info "验证配置..."
+            local password_auth=$(sshd -T 2>/dev/null | grep "^passwordauthentication" | awk '{print $2}')
+            local root_login=$(sshd -T 2>/dev/null | grep "^permitrootlogin" | awk '{print $2}')
+
+            if [[ "$password_auth" == "no" ]] && [[ "$root_login" == "prohibit-password" ]]; then
+                print_success "配置验证通过："
+                echo "  ✓ 密码登录: 已禁用"
+                echo "  ✓ Root登录: 仅密钥"
+            else
+                print_warning "配置可能未完全生效，请手动验证："
+                echo "  当前 PasswordAuthentication: $password_auth (期望: no)"
+                echo "  当前 PermitRootLogin: $root_login (期望: prohibit-password)"
+            fi
+
+            return 0
+        else
+            print_error "SSH服务重启失败"
+            print_info "查看服务状态："
+            systemctl status "$service_name" --no-pager -l || true
+            return 1
+        fi
     fi
 }
 
