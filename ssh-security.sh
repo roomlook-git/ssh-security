@@ -204,17 +204,40 @@ check_ssh_service() {
 
 # 重启SSH服务
 restart_ssh() {
-    if systemctl list-units --type=service 2>/dev/null | grep -q sshd.service; then
-        systemctl restart sshd
-    elif systemctl list-units --type=service 2>/dev/null | grep -q ssh.service; then
-        systemctl restart ssh
+    local service_name=""
+
+    # 方法1: 检查 unit-files（最可靠）
+    if systemctl list-unit-files 2>/dev/null | grep -q "^sshd.service"; then
+        service_name="sshd"
+    elif systemctl list-unit-files 2>/dev/null | grep -q "^ssh.service"; then
+        service_name="ssh"
+    # 方法2: 尝试检查服务状态
+    elif systemctl status sshd &>/dev/null || systemctl is-enabled sshd &>/dev/null; then
+        service_name="sshd"
+    elif systemctl status ssh &>/dev/null || systemctl is-enabled ssh &>/dev/null; then
+        service_name="ssh"
+    # 方法3: 检查进程
+    elif pgrep -x "sshd" &>/dev/null; then
+        service_name="sshd"
     else
         print_error "无法找到SSH服务"
+        print_info "尝试查看系统服务列表："
+        systemctl list-unit-files | grep -i ssh || true
         return 1
     fi
 
-    print_success "SSH服务已重启"
-    return 0
+    print_info "检测到SSH服务: $service_name"
+
+    # 执行重启
+    if systemctl restart "$service_name" 2>&1; then
+        print_success "SSH服务已重启"
+        return 0
+    else
+        print_error "SSH服务重启失败"
+        print_info "查看服务状态："
+        systemctl status "$service_name" --no-pager -l || true
+        return 1
+    fi
 }
 
 # ==================== 功能1: 检查SSH密钥配置 ====================
