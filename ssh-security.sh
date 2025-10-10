@@ -540,6 +540,62 @@ disable_password_login() {
         print_success "Include 指令已存在"
     fi
 
+    # 检查并处理冲突的 drop-in 配置文件
+    print_info "检查是否存在冲突的配置文件..."
+    local conflicting_files=()
+    local found_conflicts=false
+
+    # 检查可能冲突的配置文件
+    if [[ -d "$SSHD_CONFIG_DIR" ]]; then
+        while IFS= read -r -d '' file; do
+            if [[ -f "$file" ]] && [[ "$file" != "$SSHD_SECURITY_CONF" ]]; then
+                # 检查文件内容是否包含会覆盖安全设置的指令
+                if grep -qE "^[[:space:]]*(PasswordAuthentication|PermitRootLogin|PubkeyAuthentication)[[:space:]]" "$file" 2>/dev/null; then
+                    conflicting_files+=("$file")
+                    found_conflicts=true
+                fi
+            fi
+        done < <(find "$SSHD_CONFIG_DIR" -name "*.conf" -type f -print0 2>/dev/null)
+    fi
+
+    if [[ "$found_conflicts" == true ]]; then
+        echo
+        print_warning "发现可能冲突的配置文件（可能是VPS提供商预置）："
+        echo
+        for file in "${conflicting_files[@]}"; do
+            echo "  - $(basename "$file")"
+            echo "    内容预览："
+            grep -E "^[[:space:]]*(PasswordAuthentication|PermitRootLogin|PubkeyAuthentication)" "$file" 2>/dev/null | sed 's/^/      /'
+            echo
+        done
+
+        print_warning "这些文件可能会覆盖我们的安全配置！"
+        print_info "说明：SSH配置遵循'首次匹配生效'原则，按字母顺序加载配置文件"
+        print_info "文件名靠前（如01-）的配置会覆盖靠后（如99-）的配置"
+        echo
+
+        if confirm "是否备份并移除这些冲突的配置文件？"; then
+            for file in "${conflicting_files[@]}"; do
+                # 备份冲突文件
+                if backup_file "$file"; then
+                    # 删除冲突文件
+                    rm -f "$file"
+                    print_success "已移除: $(basename "$file")"
+                else
+                    print_warning "无法备份: $(basename "$file")，跳过删除"
+                fi
+            done
+            echo
+            print_success "冲突配置已处理"
+        else
+            print_warning "保留冲突配置文件，但安全配置可能不会生效！"
+            print_info "建议：配置完成后手动删除这些文件或重命名为 zz- 开头"
+        fi
+        echo
+    else
+        print_success "未发现冲突的配置文件"
+    fi
+
     # 创建新的 drop-in 配置
     print_info "生成新的 SSH 安全配置 (drop-in)..."
     print_info "配置文件: $SSHD_SECURITY_CONF"
